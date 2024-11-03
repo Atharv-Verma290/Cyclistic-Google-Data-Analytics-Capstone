@@ -1,0 +1,323 @@
+---
+title: "Cyclistic_2023_analysis"
+author: "Atharv Verma"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+# Cyclistic Bike-Share 2023 Analysis
+
+### Step-1: Data Gathering
+
+The preprocessed data is stored in overall_data_2023.csv file from the database.
+
+#### Loading libraries
+
+```{r}
+library(tidyverse)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(scales)
+```
+
+#### Importing data:
+
+```{r}
+tripdata <- read.csv("overall_data_2023.csv", header = TRUE, sep = ",")
+tripdata
+```
+
+### Step-2: Statistics
+
+#### Summary Stats:
+
+summary_stats shows the general stats of the data.
+
+```{r}
+mode_start_day <- tripdata %>%
+  count(start_day) %>%
+  filter(n == max(n)) %>%
+  pull(start_day)
+
+summary_stats <- tripdata %>% 
+  summarise(mean_duration = mean(duration, na.rm = TRUE),
+            max_duration = max(duration, na.rm = TRUE),
+            total_casual_riders = sum(membership_type == "casual", na.rm = TRUE),
+            total_member_riders = sum(membership_type == "member", na.rm = TRUE),
+            mode_start_day = mode_start_day)
+
+print(summary_stats)
+```
+
+-   Average ride duration: 18 minutes approx.
+-   Max ride duration: 98489 minutes
+-   Total Casual Rides in 2023: 4,078,350
+-   Total Member Rides in 2023: 7,171,103
+-   Most frequent rides on: Saturday
+
+#### Duration Stats:
+
+Statistics of ride duration for casual and member riders.
+
+```{r}
+duration_stats <- tripdata %>% 
+  group_by(membership_type) %>% 
+  summarise(mean_duration = mean(duration, na.rm = TRUE),
+            max_duration = max(duration, na.rm = TRUE),
+            median_duration = median(duration, na.rm = TRUE),
+            total_riders = n())
+print(duration_stats)
+```
+
+#### Day Stats:
+
+Statistics of start day for casual and member riders.
+
+```{r}
+day_stats <- tripdata %>% 
+  mutate(start_day = str_trim(start_day)) %>% 
+  group_by(membership_type, start_day) %>% 
+  summarise(total_rides = n()) %>% 
+  mutate(start_day = factor(start_day, levels = c("Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"))) %>% 
+  arrange(membership_type, start_day)
+print(day_stats)
+```
+
+#### Time of Day Stats:
+
+Statistics of time of day for casual and member riders.
+
+```{r}
+time_of_day_stats <- tripdata %>% 
+  group_by(membership_type, time_of_day) %>% 
+  summarise(total_rides = n()) %>% 
+  arrange(membership_type, time_of_day)
+print(time_of_day_stats)
+```
+
+#### Bike Type Stats:
+
+Statistics of bike type used by casual and member riders.
+
+```{r}
+bike_type_stats <- tripdata %>% 
+  group_by(membership_type, bike_type) %>% 
+  summarise(total_rides = n()) %>% 
+  arrange(membership_type, -total_rides)
+print(bike_type_stats)
+```
+
+#### Month Stats:
+
+Statistics of Start month of rides by casual and member riders.
+
+```{r}
+month_stats <- tripdata %>% 
+  mutate(start_month = str_trim(start_month)) %>% 
+  group_by(membership_type, start_month) %>% 
+  summarise(total_rides = n()) %>% 
+  mutate(start_month = factor(start_month, levels = c("January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"))) %>%
+  arrange(start_month)
+print(month_stats)
+```
+
+#### Hour Stats:
+
+Statistics of Start hour of rides by casual and member riders.
+
+```{r}
+hour_stats <- tripdata %>%
+  group_by(membership_type, start_hour) %>%
+  summarise(total_rides = n(), .groups = 'drop') %>% 
+  mutate(start_hour = factor(start_hour, 
+                             levels = c("12 AM", "1 AM", "2 AM", "3 AM", "4 AM", "5 AM", "6 AM", "7 AM", 
+                                        "8 AM", "9 AM", "10 AM", "11 AM",
+                                        "12 PM", "1 PM", "2 PM", "3 PM", "4 PM", "5 PM", "6 PM", "7 PM", 
+                                        "8 PM", "9 PM", "10 PM", "11 PM"))) %>%
+  arrange(membership_type, start_hour)
+print(hour_stats)
+```
+
+#### Season Stats:
+
+Statistics of season of rides by casual and member riders.
+
+```{r}
+season_membership_stats <- tripdata %>% 
+  group_by(membership_type, season) %>% 
+  summarise(total_rides = n())
+print(season_membership_stats)
+```
+
+#### Season Percentage Stats:
+
+Statistics of season percentage rides of total riders.
+
+```{r}
+season_stats <- tripdata %>% 
+  group_by(season) %>% 
+  summarise(total_rides = n()) %>% 
+  mutate(percentage = total_rides / sum(total_rides) * 100)  # Calculate percentage
+print(season_stats)
+```
+
+### Step-3: Visualization and Insights
+
+#### Ride Duration by Membership Type
+
+```{r pressure, echo=FALSE}
+ggplot(tripdata, aes(x = membership_type, y=duration)) + geom_boxplot() + labs(title = "Trip Duration by Membership Type", y= "Duration(minutes)", x="Membership Type")
+```
+
+**Insights:**
+
+-   Casual riders ride for longer duration.
+
+-   Casual ride duration is scattered and varying.
+
+-   Member riders ride for shorter duration.
+
+-   Member ride duration is fairly consistent for majority of riders.
+
+#### Ride by Days of Week
+
+```{r}
+ggplot(day_stats, aes(x = start_day, y=total_rides, fill = membership_type)) + geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "Rides by Day of the Week", x = "Day of the Week", y = "Total Rides")+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+**Insights:**
+
+-   Casual rides are almost half of Member rides during weekdays.
+
+-   Casual rides almost catch upto Member rides on weekends.
+
+-   Casual riders use more rides on weekends.
+
+-   Member riders use more rides on weekdays.
+
+#### Ride by Time of Day
+
+```{r}
+#Rides by Time of Day
+ggplot(time_of_day_stats, aes(x = time_of_day, y=total_rides, fill = membership_type)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "Rides by Time of Day", x = "Time of Day", y="Total Rides")
+```
+
+**Insights:**
+
+-   Both casual and member riders use bike rides during Afternoon hours the most.
+
+-   Total rides are the lowest during Night hours for both casual and member riders.
+
+#### Bike Type Usage by Membership Type
+
+```{r}
+#Bike Type Usage
+library(scales)
+ggplot(bike_type_stats, aes(x = bike_type, y = total_rides, fill = membership_type)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(
+    title = "Bike Type Usage by Membership Type", 
+    x = "Bike Type", 
+    y="Total Rides"
+    ) + 
+  scale_y_continuous(labels = scales::comma)
+```
+
+**Insights:**
+
+-   Docked bikes are only booked by Casual riders.
+
+-   Member riders do not book docked bikes.
+
+#### Rides by Month
+
+```{r}
+ggplot(month_stats, aes(x = start_month, y = total_rides, fill = membership_type)) +
+  geom_bar(stat = "identity", position = "dodge") + 
+  labs(title = "Total Rides by Month", x = "Month", y = "Total Rides") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+**Insights:**
+
+-   Hot months like June, July, and August are the busiest.
+
+#### Rides by Hour
+
+```{r}
+ggplot(hour_stats, aes(x = start_hour, y = total_rides, color = membership_type, group = membership_type)) +
+  geom_line() +
+  geom_point() +
+  labs(
+    title = "Total Rides by Hour",
+    x = "Start Hour",
+    y = "Total Rides",
+    color = "Membership Type"
+  ) +
+  scale_y_continuous(labels = scales::comma) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+**Insights:**
+
+-   Casual rides peaks till 5PM.
+
+-   Member rides correlates to the standard office hours.
+
+#### Rides by Season
+
+```{r}
+# Create a bar chart
+ggplot(season_membership_stats, aes(x = season, y = total_rides, fill = membership_type)) +
+  geom_bar(stat = "identity", position = position_dodge()) +  # Position bars side by side
+  labs(
+    title = "Total Rides by Season and Membership Type",
+    x = "Season",
+    y = "Total Rides",
+    fill = "Membership Type"
+  ) +
+  scale_y_continuous(labels = scales::comma) +
+  theme_minimal() +  # Use a minimal theme
+  theme(
+    plot.title = element_text(hjust = 0.5)  # Center title
+  )
+
+season_stats <- tripdata %>% 
+  group_by(season) %>% 
+  summarise(total_rides = n()) %>% 
+  mutate(percentage = total_rides / sum(total_rides) * 100)  # Calculate percentage
+print(season_stats)
+
+# Create a donut chart
+ggplot(season_stats, aes(x = "", y = total_rides, fill = season)) +
+  geom_bar(stat = "identity", width = 0.5, position = "stack", color = "white") +  # Create bars with white border
+  coord_polar("y") +  # Convert to polar coordinates
+  labs(
+    title = "Percentage of Total Rides by Season",
+    fill = "Season"
+  ) +
+  theme_void() +  # Remove axes and grid
+  theme(
+    plot.title = element_text(hjust = 0.5),  # Center title
+    legend.position = "right"  # Position legend
+  ) +
+  # Create the hole for the donut
+  geom_polygon(data = data.frame(x = 0, y = 0, r = 0.4), 
+               aes(x = x, y = y), fill = "white", inherit.aes = FALSE) +  # Create the donut hole
+  # Add percentage labels on the donut segments
+  geom_text(aes(label = paste0(round(percentage, 1), "%")), 
+            position = position_stack(vjust = 0.5), 
+            color = "black", size = 5, fontface = "bold")  # Adjust text size and style
+```
+
+**Insights:**
+
+-   Summer months are the busiest.
+
+-   Massive fall-out in Winter months.
